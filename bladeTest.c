@@ -97,27 +97,9 @@ int configure_module(struct bladerf *dev, struct module_config *c)
 
 
 
+int initXB200(struct bladerf *dev){
 
-
-int GPIOtest(struct bladerf *dev){
-
-const uint32_t pins_to_write =
-    BLADERF_XB200_PIN_J16_1 |
-    BLADERF_XB200_PIN_J16_2 ;
-
-// Truth table for antenna selection
-
-    const uint32_t antennas[4] = {0, 
-        BLADERF_XB200_PIN_J16_1, 
-        BLADERF_XB200_PIN_J16_2, 
-        BLADERF_XB200_PIN_J16_1 | BLADERF_XB200_PIN_J16_2};
-    ///const uint32_t ant1 = 0;
-    //const uint32_t ant2 = BLADERF_XB200_PIN_J16_1;
-   // const uint32_t ant3 = BLADERF_XB200_PIN_J16_2;
-    //const uint32_t ant4 = BLADERF_XB200_PIN_J16_1 | BLADERF_XB200_PIN_J16_2;
-
-
-    //Attach XB200 Expansion board
+   //Attach XB200 Expansion board
     int status = bladerf_expansion_attach(dev, BLADERF_XB_200);
     printf("Attached XB-200 with status %d\n", status);
 
@@ -125,17 +107,50 @@ const uint32_t pins_to_write =
     status = bladerf_xb200_set_filterbank(dev, BLADERF_MODULE_RX, BLADERF_XB200_144M);
     printf("Selected filter bank with status %d\n", status);
 
-    //Use XB-200 mixer path
+    //Bypass XB-200 mixer path
     status = bladerf_xb200_set_path(dev, BLADERF_MODULE_RX, BLADERF_XB200_BYPASS);
     printf("Selected bypass mixer with status %d\n", status);
 
+}
+
+
+int GPIOtest(struct bladerf *dev){
+
+const uint32_t pins_to_write =
+    BLADERF_XB200_PIN_J16_1 |
+    BLADERF_XB200_PIN_J16_2 |
+    BLADERF_XB200_PIN_J16_3 |
+    BLADERF_XB200_PIN_J16_4 ;
+
+// Truth table for antenna selection
+const uint32_t antennas[4] = {0, 
+    BLADERF_XB200_PIN_J16_1, 
+    BLADERF_XB200_PIN_J16_2, 
+    BLADERF_XB200_PIN_J16_1 | BLADERF_XB200_PIN_J16_2};
+
     //Configure J16 pins 1 and 2 as outputs
-    status = bladerf_expansion_gpio_masked_write(dev, pins_to_config, output_pins);
+    int status = bladerf_expansion_gpio_dir_masked_write(dev, pins_to_config, output_pins);
     printf("Configured direction register with status %d\n", status);
 
-    while(1){
+    
+
+    /* Loop endlessly, cycling through antennas */
+    
+    // Max switching speed using following code measured at 101.5uS using logic analyser
+    // GPIO voltage 1.8v
+    // TODO: Test ability to stop/start sample acquisition between switches
+    while(1){ 
         for (int i = 0; i < 4; i ++){
-            bladerf_expansion_gpio_masked_write(dev, pins_to_write, antennas[i]);
+            status =  bladerf_expansion_gpio_masked_write(dev, pins_to_write, antennas[i]);
+            //printf("wrote antenna config %d with status %d. ",i, status);
+            if(status != 0){
+              printf("GPIO write error (%d)\n", status);  
+            }
+            uint32_t val = 0;
+            //status = bladerf_expansion_gpio_read(dev, &val);
+            //printf("Pin values are %d\n", val);
+            //fflush(stdout);
+    
         }
     }
 
@@ -206,6 +221,7 @@ int main(int argc, char *argv[])
      * transmit or receive samples!
      */
 
+    initXB200(dev);
     GPIOtest(dev);
 
 
