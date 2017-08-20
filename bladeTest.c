@@ -163,10 +163,67 @@ int do_work(){
 }
 
 
+int close_rx_resources(struct bladerf *dev){
+
+    int status = -1;
+
+    /* Disable RX module, shutting down our underlying RX stream */
+    status = bladerf_enable_module(dev, BLADERF_MODULE_RX, false);
+    if (status != 0) {
+        fprintf(stderr, "Failed to disable RX module: %s\n",
+                bladerf_strerror(status));
+    }
+    /* Disable TX module, shutting down our underlying TX stream */
+    status = bladerf_enable_module(dev, BLADERF_MODULE_TX, false);
+    if (status != 0) {
+        fprintf(stderr, "Failed to disable TX module: %s\n",
+                bladerf_strerror(status));
+    }
+
+}
+
+
+int sync_rx_prep(struct bladerf *dev){
+
+    int status, ret;
+    
+   
+
+
+    /* Initialize synch interface on RX and TX modules */
+    status = init_sync(dev);
+    if (status != 0) {
+        goto out;
+    }
+    status = bladerf_enable_module(dev, BLADERF_MODULE_RX, true);
+    if (status != 0) {
+        fprintf(stderr, "Failed to enable RX module: %s\n",
+                bladerf_strerror(status));
+        goto out;
+    }
+    status = bladerf_enable_module(dev, BLADERF_MODULE_TX, true);
+    if (status != 0) {
+        fprintf(stderr, "Failed to enable RX module: %s\n",
+                bladerf_strerror(status));
+        goto out;
+    }
+
+
+
+out:
+    ret = status;
+    
+    /* Free up our resources */
+    //free(rx_samples);
+    //free(tx_samples);
+    return ret;
+
+}
+
 int sync_rx(struct bladerf *dev, unsigned int num_samples)
 {
-    int status, ret;
-    bool done = false;
+
+
     bool have_tx_data = false;
     /* "User" samples buffers and their associated sizes, in units of samples.
      * Recall that one sample = two int16_t values. */
@@ -186,24 +243,11 @@ int sync_rx(struct bladerf *dev, unsigned int num_samples)
         free(rx_samples);
         return BLADERF_ERR_MEM;
     }
-    /* Initialize synch interface on RX and TX modules */
-    status = init_sync(dev);
-    if (status != 0) {
-        goto out;
-    }
-    status = bladerf_enable_module(dev, BLADERF_MODULE_RX, true);
-    if (status != 0) {
-        fprintf(stderr, "Failed to enable RX module: %s\n",
-                bladerf_strerror(status));
-        goto out;
-    }
-    status = bladerf_enable_module(dev, BLADERF_MODULE_TX, true);
-    if (status != 0) {
-        fprintf(stderr, "Failed to enable RX module: %s\n",
-                bladerf_strerror(status));
-        goto out;
-    }
-    while (status == 0 && !done) {
+
+    bool done = false;
+    int status = 0;
+
+while (status == 0 && !done) {
         /* Receive samples */
         status = bladerf_sync_rx(dev, rx_samples, samples_len, NULL, 5000);
         if (status == 0) {
@@ -225,34 +269,16 @@ int sync_rx(struct bladerf *dev, unsigned int num_samples)
                     bladerf_strerror(status));
         }
     }
-    if (status == 0) {
-        /* Wait a few seconds for any remaining TX samples to finish
-         * reaching the RF front-end */
-        //usleep(2000000);
-    }
-out:
-    ret = status;
-    /* Disable RX module, shutting down our underlying RX stream */
-    status = bladerf_enable_module(dev, BLADERF_MODULE_RX, false);
-    if (status != 0) {
-        fprintf(stderr, "Failed to disable RX module: %s\n",
-                bladerf_strerror(status));
-    }
-    /* Disable TX module, shutting down our underlying TX stream */
-    status = bladerf_enable_module(dev, BLADERF_MODULE_TX, false);
-    if (status != 0) {
-        fprintf(stderr, "Failed to disable TX module: %s\n",
-                bladerf_strerror(status));
-    }
-    /* Free up our resources */
-    free(rx_samples);
-    free(tx_samples);
-    return ret;
+
+    return status;
+
 }
 
 
 
 int GPIOtest(struct bladerf *dev){
+
+    bool verbose = false;
 
 //number of samples to receive at each antenna configuration
 int num_samples = 1000;
@@ -283,6 +309,11 @@ const uint32_t antennas[4] = {0,
     // TODO: Test ability to stop/start sample acquisition between switches
     // TODO: Improve 93ms switching time by removing overhead in sync_rc
     // TODO: Do something with input samples (send to file for now)
+
+
+//prepare for sync rx:
+    sync_rx_prep(dev);
+
     while(1){ 
         for (int i = 0; i < 4; i ++){
             status =  bladerf_expansion_gpio_masked_write(dev, pins_to_write, antennas[i]);
@@ -298,8 +329,9 @@ const uint32_t antennas[4] = {0,
 
             //Receive 10000 samples
 
-            status = sync_rx(dev, num_samples); // The overhead in this call moves switching time to 93 ms
-            printf("Received %d samples with status (%d)\n", num_samples ,status);  
+            //status = sync_rx(dev, num_samples); // The overhead in this call moves switching time to 93 ms
+           
+           if(verbose){ printf("Received %d samples with status (%d)\n", num_samples ,status);  }
     
         }
     }
