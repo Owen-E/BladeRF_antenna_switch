@@ -134,7 +134,7 @@ static int init_sync(struct bladerf *dev)
      * interface. SC16 Q11 samples *without* metadata are used. */
     status = bladerf_sync_config(dev,
                                  BLADERF_MODULE_RX,
-                                 BLADERF_FORMAT_SC16_Q11,
+                                 BLADERF_FORMAT_SC16_Q11_META,
                                  num_buffers,
                                  buffer_size,
                                  num_transfers,
