@@ -17,6 +17,31 @@ const uint32_t output_pins =
 
 
 
+//struct blade_metadata rx_meta;
+ /*   struct bladerf_metadata {
+        uint64_t timestamp;
+        uint32_t flags;
+        uint32_t status;
+        unsigned int actual_count;
+        uint8_t reserved [32];
+    } ;
+    
+#endif
+
+*/
+    /* Contains
+    uint64_t timestamp
+    uint32_t flags
+    uint32_t status
+    unsigned int actual_count
+    uint8_t reserved [32]
+
+    I will use reserved to store antenna switch status, as this is currently unused by Nuand
+    */
+
+
+
+
 /* The RX and TX modules are configured independently for these parameters */
 struct module_config {
     bladerf_module module;
@@ -134,7 +159,7 @@ static int init_sync(struct bladerf *dev)
      * interface. SC16 Q11 samples *without* metadata are used. */
     status = bladerf_sync_config(dev,
                                  BLADERF_MODULE_RX,
-                                 BLADERF_FORMAT_SC16_Q11_META,
+                                 BLADERF_FORMAT_SC16_Q11_META, //CURRENT, causes error -3 on receive
                                  num_buffers,
                                  buffer_size,
                                  num_transfers,
@@ -146,7 +171,7 @@ static int init_sync(struct bladerf *dev)
     }
     status = bladerf_sync_config(dev,
                                  BLADERF_MODULE_TX,
-                                 BLADERF_FORMAT_SC16_Q11,
+                                 BLADERF_FORMAT_SC16_Q11_META,
                                  num_buffers,
                                  buffer_size,
                                  num_transfers,
@@ -220,9 +245,15 @@ out:
 
 }
 
-int sync_rx(struct bladerf *dev, unsigned int num_samples)
+
+
+int sync_rx(struct bladerf *dev, unsigned int num_samples)//, struct bladerf_metadata *rx_meta)
 {
 
+
+
+
+struct bladerf_metadata rx_meta;
 
     bool have_tx_data = false;
     /* "User" samples buffers and their associated sizes, in units of samples.
@@ -249,7 +280,8 @@ int sync_rx(struct bladerf *dev, unsigned int num_samples)
 
 while (status == 0 && !done) {
         /* Receive samples */
-        status = bladerf_sync_rx(dev, rx_samples, samples_len, NULL, 5000);
+        status = bladerf_sync_rx(dev, rx_samples, samples_len, &rx_meta, 5000);
+
         if (status == 0) {
             /* Process these samples, and potentially produce a response
              * to transmit */
@@ -268,6 +300,11 @@ while (status == 0 && !done) {
             fprintf(stderr, "Failed to RX samples: %s\n",
                     bladerf_strerror(status));
         }
+        //receieve timestamp and possibly metadata (takes dev, module, uint64_t buffer)
+//        status = bladerf_get_timestamp(dev, BLADERF_MODULE_RX, &meta); //CURRENT
+
+       printf("Struct metatdata = %lu \n", rx_meta.timestamp);
+
     }
 
     return status;
@@ -275,13 +312,15 @@ while (status == 0 && !done) {
 }
 
 
+uint64_t meta = 0;
+int GPIOtest(struct bladerf *dev){//, struct bladerf_metadata *rx_meta){
 
-int GPIOtest(struct bladerf *dev){
-
-    bool verbose = false;
+    bool verbose = true;
 
 //number of samples to receive at each antenna configuration
 int num_samples = 1000;
+
+
 
 
 const uint32_t pins_to_write =
@@ -329,11 +368,16 @@ const uint32_t antennas[4] = {0,
 
             //Receive 10000 samples
 
-            //status = sync_rx(dev, num_samples); // The overhead in this call moves switching time to 93 ms
+            status = sync_rx(dev, num_samples);//, rx_meta); // The overhead in this call moves switching time to 93 ms
            
            if(verbose){ printf("Received %d samples with status (%d)\n", num_samples ,status);  }
-    
+
+           if(verbose){ printf("Metadata :  %lu",meta);}
+
+
+            //return 0;
         }
+
     }
 
     return 0;
@@ -359,6 +403,20 @@ int main(int argc, char *argv[])
     struct module_config config;
     struct bladerf *dev = NULL;
     struct bladerf_devinfo dev_info;
+
+    
+    /* Contains
+    uint64_t timestamp
+    uint32_t flags
+    uint32_t status
+    unsigned int actual_count
+    uint8_t reserved [32]
+
+    I will use reserved to store antenna switch status, as this is currently unused by Nuand
+    */
+
+
+
     /* Initialize the information used to identify the desired device
      * to all wildcard (i.e., "any device") values */
     bladerf_init_devinfo(&dev_info);
@@ -405,7 +463,7 @@ int main(int argc, char *argv[])
      */
 
     initXB200(dev);
-    GPIOtest(dev);
+    GPIOtest(dev);//, rx_meta);
 
 
 out:
