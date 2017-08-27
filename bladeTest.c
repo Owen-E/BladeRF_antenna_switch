@@ -278,7 +278,13 @@ struct bladerf_metadata rx_meta;
     bool done = false;
     int status = 0;
 
+
 while (status == 0 && !done) {
+
+       //reset metadata array before usage
+        memset(&rx_meta, 0, sizeof(rx_meta));        
+        rx_meta.flags = BLADERF_META_FLAG_RX_NOW;
+
         /* Receive samples */
         status = bladerf_sync_rx(dev, rx_samples, samples_len, &rx_meta, 5000);
 
@@ -303,7 +309,17 @@ while (status == 0 && !done) {
         //receieve timestamp and possibly metadata (takes dev, module, uint64_t buffer)
 //        status = bladerf_get_timestamp(dev, BLADERF_MODULE_RX, &meta); //CURRENT
 
-       printf("Struct metatdata = %lu \n", rx_meta.timestamp);
+
+        
+
+       printf("Metadata(antsel) = %d \n", rx_meta.timestamp >> 62);
+       printf("Metadata(timestamp) = %lu \n", rx_meta.timestamp);
+       printf("Metadata(flags) = %x \n", rx_meta.flags);
+       printf("Metadata(status) = %u \n", rx_meta.status);
+       printf("Metadata(actual_count) = %u \n", rx_meta.actual_count);
+       printf("Metadata(reserved) = 0x");
+       for(int a = 0; a < 32; a ++){ printf("%x",rx_meta.reserved[a]);}
+       printf("\n\n");
 
     }
 
@@ -318,7 +334,7 @@ int GPIOtest(struct bladerf *dev){//, struct bladerf_metadata *rx_meta){
     bool verbose = true;
 
 //number of samples to receive at each antenna configuration
-int num_samples = 1000;
+int num_samples = 500;
 
 
 
@@ -372,7 +388,7 @@ const uint32_t antennas[4] = {0,
            
            if(verbose){ printf("Received %d samples with status (%d)\n", num_samples ,status);  }
 
-           if(verbose){ printf("Metadata :  %lu",meta);}
+          // if(verbose){ printf("Metadata :  %lu",meta);}
 
 
             //return 0;

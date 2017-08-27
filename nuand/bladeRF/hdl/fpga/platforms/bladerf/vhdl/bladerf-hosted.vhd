@@ -93,6 +93,8 @@ architecture hosted_bladerf of bladerf is
     -- Can be set from libbladeRF using bladerf_set_rx_mux()
     type rx_mux_mode_t is (RX_MUX_NORMAL, RX_MUX_12BIT_COUNTER, RX_MUX_32BIT_COUNTER, RX_MUX_ENTROPY, RX_MUX_DIGITAL_LOOPBACK) ;
 
+    signal antsel			: std_logic_vector(1 downto 0) ; -- OWEN MODIFIED (added)
+
     signal rx_mux_sel       : unsigned(2 downto 0) ;
     signal rx_mux_mode      : rx_mux_mode_t ;
 
@@ -764,6 +766,9 @@ begin
     -- Sample bridges
     U_fifo_writer : entity work.fifo_writer
       port map (
+
+      	antsel				=> 	antsel,
+
         clock               =>  rx_clock,
         reset               =>  rx_reset,
         enable              =>  rx_enable,
@@ -1249,14 +1254,21 @@ begin
             led(2) <= '0';
             led(1) <= '1';
             led(3) <= '1';
+
+            antsel <= "00";
+
         elsif (counter < 38_400_000) then
             led(2) <= '1';
             led(1) <= '0';
             led(3) <= '1';
+
+            antsel <= "01";
         else
             led(2) <= '1';
             led(1) <= '1';
             led(3) <= '0';
+
+            antsel <= "10";
         end if;
     end if;
 end process;
