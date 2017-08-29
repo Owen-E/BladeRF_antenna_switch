@@ -1176,21 +1176,28 @@ begin
     xb_gpio_direction : process(all)
     begin
         for i in 0 to 31 loop
-            if (xb_gpio_dir(i) = '1') then
-                nios_xb_gpio_in(i) <= nios_xb_gpio_out(i);
-                if (xb_mode = "10" and i + 1 = 2) then
-                    exp_gpio(i+1) <= nios_ss_n(1);
-                elsif (i + 1 /= 1) then
-                    exp_gpio(i+1) <= nios_xb_gpio_out(i);
-                end if;
+        	if (i /= 10 and i /= 11) then 
+            	if (xb_gpio_dir(i) = '1') then
+	                nios_xb_gpio_in(i) <= nios_xb_gpio_out(i);
+                	if (xb_mode = "10" and i + 1 = 2) then
+	                    exp_gpio(i+1) <= nios_ss_n(1);
+                	elsif (i + 1 /= 1) then
+	                    exp_gpio(i+1) <= nios_xb_gpio_out(i);
+                	end if;
+            	else
+	                if (i + 1 = 1) then
+                    	nios_xb_gpio_in(i) <= exp_clock_in;
+                	else
+	                    nios_xb_gpio_in(i) <= exp_gpio(i + 1);
+                    	exp_gpio(i + 1) <= 'Z';
+                	end if;
+            	end if;
             else
-                if (i + 1 = 1) then
-                    nios_xb_gpio_in(i) <= exp_clock_in;
-                else
-                    nios_xb_gpio_in(i) <= exp_gpio(i + 1);
-                    exp_gpio(i + 1) <= 'Z';
-                end if;
-            end if;
+            	nios_xb_gpio_dir(10) <= '1'; --OWEN MODIFIED (added) 
+            	nios_xb_gpio_dir(11) <= '1'; --OWEN MODIFIED (added) 
+            	exp_gpio(10) <= antsel(0);--OWEN MODIFIED (added) 
+            	exp_gpio(11) <= antsel(1);--OWEN MODIFIED (added) 
+            end if;            		
         end loop ;
     end process ;
 
@@ -1359,3 +1366,4 @@ end process;
 
 end architecture ; -- arch
 
+ 
