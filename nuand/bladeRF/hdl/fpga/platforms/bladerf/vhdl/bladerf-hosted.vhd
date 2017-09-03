@@ -1248,34 +1248,67 @@ begin
 
 
    -- START MODIFIED
+
+
+-- ANTENNA SELECTION PROCESS
+
+    antenna_selector : process (c4_clock)
+    variable counter2 : natural range 0 to 3_000_0000 := 3_000_0000;
+begin
+    if (rising_edge(c4_clock)) then
+        counter2 := counter2 - 1;
+        if (counter2 = 0) then
+            counter2 := 3;
+           -- antsel <= "11";
+        elsif (counter2 < 1_000_0000) then
+            --antsel <= "00";
+        elsif (counter2 < 2_000_0000) then
+          --  antsel <= "01";
+        elsif (counter2 < 3_000_0000) then
+           -- antsel <= "10";
+        else
+        end if;
+    end if;
+end process;
+
+
+
+
    -- c4_clock is 38.4MHz
 
+-- CUSTOM LED BLINKING (indicate custom FPGA actve)
+
     blink_leds : process (c4_clock)
-    variable counter : natural range 0 to 57_600_000 := 57_600_000;
+    variable counter : natural range 0 to 100_000_000 := 100_000_000;
 begin
     if (rising_edge(c4_clock)) then
         counter := counter - 1;
         if (counter = 0) then
-            counter := 57_600_000;
-        elsif (counter < 19_200_000) then
+            counter := 100_000_000;
+        elsif (counter < 25_000_000) then
             led(2) <= '0';
             led(1) <= '1';
             led(3) <= '1';
+             antsel <= "00";
 
-            antsel <= "00";
-
-        elsif (counter < 38_400_000) then
+        elsif (counter < 50_000_000) then
             led(2) <= '1';
             led(1) <= '0';
             led(3) <= '1';
-
             antsel <= "01";
-        else
-            led(2) <= '1';
+
+        elsif (counter < 75_000_000) then
+        	led(2) <= '1';
             led(1) <= '1';
             led(3) <= '0';
-
             antsel <= "10";
+
+        else
+            led(2) <= '0';
+            led(1) <= '0';
+            led(3) <= '0';
+            antsel <= "11";
+
         end if;
     end if;
 end process;

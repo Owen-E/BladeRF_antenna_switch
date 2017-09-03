@@ -313,7 +313,7 @@ while (status == 0 && !done) {
         
 
        printf("Metadata(antsel) = %d \n", rx_meta.timestamp >> 62);
-       printf("Metadata(timestamp) = %lu \n", rx_meta.timestamp);
+       printf("Metadata(timestamp) = %lu \n", (rx_meta.timestamp << 2) >>2 );
        printf("Metadata(flags) = %x \n", rx_meta.flags);
        printf("Metadata(status) = %u \n", rx_meta.status);
        printf("Metadata(actual_count) = %u \n", rx_meta.actual_count);
@@ -334,7 +334,7 @@ int GPIOtest(struct bladerf *dev){//, struct bladerf_metadata *rx_meta){
     bool verbose = true;
 
 //number of samples to receive at each antenna configuration
-int num_samples = 500;
+int num_samples = 1000;
 
 
 
