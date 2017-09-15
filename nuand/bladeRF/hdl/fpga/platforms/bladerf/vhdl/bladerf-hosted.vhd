@@ -1250,64 +1250,59 @@ begin
    -- START MODIFIED
 
 
--- ANTENNA SELECTION PROCESS
-
-    antenna_selector : process (c4_clock)
-    variable counter2 : natural range 0 to 3_000_0000 := 3_000_0000;
-begin
-    if (rising_edge(c4_clock)) then
-        counter2 := counter2 - 1;
-        if (counter2 = 0) then
-            counter2 := 3;
-           -- antsel <= "11";
-        elsif (counter2 < 1_000_0000) then
-            --antsel <= "00";
-        elsif (counter2 < 2_000_0000) then
-          --  antsel <= "01";
-        elsif (counter2 < 3_000_0000) then
-           -- antsel <= "10";
-        else
-        end if;
-    end if;
-end process;
-
-
-
-
    -- c4_clock is 38.4MHz
 
--- CUSTOM LED BLINKING (indicate custom FPGA actve)
+--cycle through antennas, blinking LEDs to indicate current selection
+
+-- 2 * desired antenna RPM = 38_400_00 / n
+
+-- n = 38_400_00 / ( 2 * desired RPM )
+
+--n/4 2n/4 3n/4 n
+
+
+
+
+--FOR 5kHz:
+--	n = 38_400_00 / (2 * 4882.8)
+--  n = 3932
+--		983 1966 2949 3932
+
+--FOR 250kHz, 39 78 117 156
+--FOR 428.6kHz, 10 20 30 40
+--FOR ? MHz, 1 2 3 4
+
 
     blink_leds : process (c4_clock)
-    variable counter : natural range 0 to 100_000_000 := 100_000_000;
+    variable counter : natural range 0 to 3932 := 3932;
 begin
     if (rising_edge(c4_clock)) then
         counter := counter - 1;
         if (counter = 0) then
-            counter := 100_000_000;
-        elsif (counter < 25_000_000) then
+            counter := 3932;
+        elsif (counter < 983) then
             led(2) <= '0';
             led(1) <= '1';
             led(3) <= '1';
              antsel <= "00";
 
-        elsif (counter < 50_000_000) then
+        elsif (counter < 1966) then
             led(2) <= '1';
             led(1) <= '0';
             led(3) <= '1';
             antsel <= "01";
 
-        elsif (counter < 75_000_000) then
+        elsif (counter < 2949) then
         	led(2) <= '1';
             led(1) <= '1';
             led(3) <= '0';
-            antsel <= "10";
+            antsel <= "11";
 
         else
             led(2) <= '0';
             led(1) <= '0';
             led(3) <= '0';
-            antsel <= "11";
+            antsel <= "10";
 
         end if;
     end if;
