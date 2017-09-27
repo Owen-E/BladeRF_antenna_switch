@@ -285,8 +285,10 @@ while (status == 0 && !done) {
         memset(&rx_meta, 0, sizeof(rx_meta));        
         rx_meta.flags = BLADERF_META_FLAG_RX_NOW;
 
+        uint32_t samplestore;
+
         /* Receive samples */
-        status = bladerf_sync_rx(dev, rx_samples, samples_len, &rx_meta, 5000);
+        status = bladerf_sync_rx(dev, rx_samples, samples_len, &rx_meta, 100);
 
         if (status == 0) {
             /* Process these samples, and potentially produce a response
@@ -296,7 +298,7 @@ while (status == 0 && !done) {
             if (!done && have_tx_data) {
                 /* Transmit a response */
                 status = bladerf_sync_tx(dev, tx_samples, samples_len,
-                                         NULL, 5000);
+                                         NULL, 100);
                 if (status != 0) {
                     fprintf(stderr, "Failed to TX samples: %s\n",
                             bladerf_strerror(status));
@@ -310,15 +312,26 @@ while (status == 0 && !done) {
 //        status = bladerf_get_timestamp(dev, BLADERF_MODULE_RX, &meta); //CURRENT
 
 
+        //TODO: save samples with metadata in csv format
+        //printf("rx_samples = %i\n", &rx_samples);
+
+        //status = fwrite(rx_samples, sizeof(int16_t), 2 * num_samples, stdout);
+
+        //stored
+        for(int i = 0; i < 2 * num_samples; i = i + 2) {
+            printf("%ld,%ld\n", rx_samples[i], rx_samples[i+1]);
+        }
+
+        fflush(stdout);
         
 
        printf("Metadata(antsel) = %d \n", rx_meta.timestamp >> 62);
        printf("Metadata(timestamp) = %lu \n", (rx_meta.timestamp << 2) >>2 );
-       printf("Metadata(flags) = %x \n", rx_meta.flags);
+     //  printf("Metadata(flags) = %x \n", rx_meta.flags);
        printf("Metadata(status) = %u \n", rx_meta.status);
        printf("Metadata(actual_count) = %u \n", rx_meta.actual_count);
-       printf("Metadata(reserved) = 0x");
-       for(int a = 0; a < 32; a ++){ printf("%x",rx_meta.reserved[a]);}
+  //     printf("Metadata(reserved) = 0x");
+    //   for(int a = 0; a < 32; a ++){ printf("%x",rx_meta.reserved[a]);}
        printf("\n\n");
 
     }
@@ -334,7 +347,7 @@ int GPIOtest(struct bladerf *dev){//, struct bladerf_metadata *rx_meta){
     bool verbose = true;
 
 //number of samples to receive at each antenna configuration
-int num_samples = 1000;
+int num_samples = 2;
 
 
 
@@ -386,7 +399,7 @@ const uint32_t antennas[4] = {0,
 
             status = sync_rx(dev, num_samples);//, rx_meta); // The overhead in this call moves switching time to 93 ms
            
-           if(verbose){ printf("Received %d samples with status (%d)\n", num_samples ,status);  }
+           if(verbose){ printf("Received %d samples with status (%d)\n\n", num_samples ,status);  }
 
           // if(verbose){ printf("Metadata :  %lu",meta);}
 
@@ -449,12 +462,12 @@ int main(int argc, char *argv[])
     }
     /* Set up RX module parameters */
     config.module     = BLADERF_MODULE_RX;
-    config.frequency  = 910000000;
+    config.frequency  = 1672500;
     config.bandwidth  = 2000000;
-    config.samplerate = 300000;
+    config.samplerate = 40000000;
     config.rx_lna     = BLADERF_LNA_GAIN_MAX;
-    config.vga1       = 30;
-    config.vga2       = 3;
+    config.vga1       = 20;
+    config.vga2       = 6;
     status = configure_module(dev, &config);
     if (status != 0) {
         fprintf(stderr, "Failed to configure RX module. Exiting.\n");
