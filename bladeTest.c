@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <libbladeRF.h>
 
+//#define debug 1
+
 
 /* Define XB200 GPIO pins, J16 */
 const uint32_t pins_to_config =
@@ -151,16 +153,16 @@ static int init_sync(struct bladerf *dev)
      * RX via bladerf_sync_rx() until a block of `buffer_size` samples has been
      * received.
      */
-    const unsigned int num_buffers   = 16;
-    const unsigned int buffer_size   = 1024;  /* Must be a multiple of 1024 */
-                                        //changed from 8192 to 1024
-    const unsigned int num_transfers = 8;
-    const unsigned int timeout_ms    = 3500;
+    const unsigned int num_buffers   = 32; //16
+    const unsigned int buffer_size   = 1024;//32768;  /* Must be a multiple of 1024 */
+                                        //changed from 8192 to 16384. higher latency
+    const unsigned int num_transfers = 16;//8
+    const unsigned int timeout_ms    = 1; //3500
     /* Configure both the device's RX and TX modules for use with the synchronous
      * interface. SC16 Q11 samples *without* metadata are used. */
     status = bladerf_sync_config(dev,
                                  BLADERF_MODULE_RX,
-                                 BLADERF_FORMAT_SC16_Q11_META, //CURRENT, causes error -3 on receive
+                                 BLADERF_FORMAT_SC16_Q11, //CURRENT, causes error -3 on receive
                                  num_buffers,
                                  buffer_size,
                                  num_transfers,
@@ -172,7 +174,7 @@ static int init_sync(struct bladerf *dev)
     }
     status = bladerf_sync_config(dev,
                                  BLADERF_MODULE_TX,
-                                 BLADERF_FORMAT_SC16_Q11_META,
+                                 BLADERF_FORMAT_SC16_Q11,
                                  num_buffers,
                                  buffer_size,
                                  num_transfers,
@@ -248,15 +250,13 @@ out:
 
 int num_underruns = 0;
 
-
- //Max samples_len with zero underruns seems to be 4.
-    const unsigned int samples_len = 10; /* May be any (reasonable) size */ //MOVE THIS 
+    
 
 
-int sync_rx(struct bladerf *dev, unsigned int num_samples)//, struct bladerf_metadata *rx_meta)
+int sync_rx(struct bladerf *dev, unsigned int num_samples, bool wait_for_sync)//, struct bladerf_metadata *rx_meta)
 {
 
-
+unsigned int samples_len = num_samples; /* May be any (reasonable) size */ //MOVE THIS 
 
 
 struct bladerf_metadata rx_meta;
@@ -299,53 +299,34 @@ while (status == 0 && !done) {
 
         uint32_t samplestore;
 
-        /* Receive single samples until antenna 0 becomes active*/
-        int16_t *discard = NULL;
-        discard = malloc(2 * sizeof(int16_t));
-        do{
-            status = bladerf_sync_rx(dev, discard, 1, &rx_meta, 100);
-        }
-        while(( rx_meta.timestamp >> 62 ) == 3);
+        if(wait_for_sync){
+            /* Receive single samples until antenna 0 first becomes active*/
+            int16_t *discard = NULL;
+            discard = malloc(2 * sizeof(int16_t));
+            do{
+                status = bladerf_sync_rx(dev, discard, 1, &rx_meta, 1);
 
-        do{ 
-            status = bladerf_sync_rx(dev, discard, 1, &rx_meta, 100);
-        }
+            }
+            while(( rx_meta.timestamp >> 62 ) == 3);
+
+            do{ 
+                status = bladerf_sync_rx(dev, discard, 1, &rx_meta, 1);
+            }
         while(( rx_meta.timestamp >> 62 ) != 0);
         free(discard);
+        }
 
 
 
         /* Receive samples */
-        status = bladerf_sync_rx(dev, rx_samples, samples_len, &rx_meta, 100);
+        status = bladerf_sync_rx(dev, rx_samples, samples_len, &rx_meta, 1);
 
-        if (status == 0) {
-            /* Process these samples, and potentially produce a response
-             * to transmit */
-            done = do_work(rx_samples, samples_len,
-                           &have_tx_data, tx_samples, samples_len);
-            if (!done && have_tx_data) {
-                /* Transmit a response */
-               // status = bladerf_sync_tx(dev, tx_samples, samples_len,
-                                       //  NULL, 100);
-               // if (status != 0) {
-                //    fprintf(stderr, "Failed to TX samples: %s\n",
-                //            bladerf_strerror(status));
-                //}
-            }
-        } else {
-            fprintf(stderr, "Failed to RX samples: %s\n",
-                    bladerf_strerror(status));
+
+        if (status != 0) {
+                fprintf(stderr, "Failed to RX samples: %s\n",
+                bladerf_strerror(status));
         }
-        //receieve timestamp and possibly metadata (takes dev, module, uint64_t buffer)
-//        status = bladerf_get_timestamp(dev, BLADERF_MODULE_RX, &meta); //CURRENT
-
-
-        //TODO: save samples with metadata in csv format
-        //printf("rx_samples = %i\n", &rx_samples);
-
-        //status = fwrite(rx_samples, sizeof(int16_t), 2 * num_samples, stdout);
-
-        //stored
+        
 
         #ifdef debug
             for(int i = 0; i < 2 * samples_len; i = i + 2) {
@@ -353,19 +334,23 @@ while (status == 0 && !done) {
             }
             printf("Metadata(antsel) = %d \n", rx_meta.timestamp >> 62);
             printf("Metadata(timestamp) = %lu \n", (rx_meta.timestamp << 2) >>2 );
-            //  printf("Metadata(flags) = %x \n", rx_meta.flags);
+              printf("Metadata(flags) = %x \n", rx_meta.flags);
             printf("Metadata(status) = %u \n", rx_meta.status);
-            printf("Metadata(actual_count) = %u \n", rx_meta.actual_count);
-            //     printf("Metadata(reserved) = 0x");
-            //   for(int a = 0; a < 32; a ++){ printf("%x",rx_meta.reserved[a]);}
+            
+                 printf("Metadata(reserved) = 0x");
+          for(int a = -32; a < 32; a ++){ printf("%x",rx_meta.reserved[a]);}
             printf("\n\n");
         #endif
+
+        printf("Metadata(actual_count) = %u \n", rx_meta.actual_count);
 
         if(rx_meta.actual_count < samples_len ){ 
             //printf("Underrun: actual = %u, desired = %d\n. total = ", rx_meta.actual_count, samples_len);
             num_underruns++;
         }
 
+ 
+/* OLD: Metadata from timestamp
        FILE *fp;
        char *filename=("recording.csv");
        fp = fopen(filename,"a");
@@ -374,16 +359,35 @@ while (status == 0 && !done) {
              fprintf(fp,"%ld,%ld", rx_samples[i], rx_samples[i+1]);
 
             if(i == 0){ //if this is the first sample in the buffer, print metadata for block
+
                 fprintf(fp,", %d, %d", rx_meta.timestamp >> 62, (rx_meta.timestamp << 2) >>2);
             }
             fprintf(fp, "\n");
         }
         fflush(fp);
         fclose(fp);
+        */
+
+// NEW: metadata from 2 LSB of I samples
+        //this will add a little quantisation noise, can lower this later by using 1 bit of I and 1 bit of Q
+        FILE *fp;
+       char *filename=("recording.csv");
+       fp = fopen(filename,"a");
+       for(int i = 0; i < 2 * samples_len; i = i + 2) {
+            fprintf(fp,"%ld,%ld", rx_samples[i] & 4092, rx_samples[i+1]);
+            fprintf(fp,", %d", rx_samples[i] & 3);
+            fprintf(fp, "\n");
+        }
+        fflush(fp);
+        fclose(fp);
+
+
+        done = true;
 
 
 
     }
+
 
     return status;
 
@@ -391,12 +395,11 @@ while (status == 0 && !done) {
 
 
 uint64_t meta = 0;
-int GPIOtest(struct bladerf *dev){//, struct bladerf_metadata *rx_meta){
+int GPIOtest(struct bladerf *dev, int num_samples){//, struct bladerf_metadata *rx_meta){
 
     bool verbose = true;
-
+    int status = 0;
 //number of samples to receive at each antenna configuration
-int num_samples = 10;
 
 
 
@@ -414,8 +417,8 @@ const uint32_t antennas[4] = {0,
     BLADERF_XB200_PIN_J16_1 | BLADERF_XB200_PIN_J16_2};
 
     //Configure J16 pins 1 and 2 as outputs
-    int status = bladerf_expansion_gpio_dir_masked_write(dev, pins_to_config, output_pins);
-    printf("Configured direction register with status %d\n", status);
+   // int status = bladerf_expansion_gpio_dir_masked_write(dev, pins_to_config, output_pins);
+  //  printf("Configured direction register with status %d\n", status);
 
     
 
@@ -450,10 +453,10 @@ const uint32_t antennas[4] = {0,
 
         //Receive num_samples samples
 
-        status = sync_rx(dev, num_samples);
+        status = sync_rx(dev, num_samples,true);
             
         #ifdef debug
-            printf("Received %d samples with status (%d)\n\n", samples_to_receive ,status);  
+            printf("Received %d samples with status (%d)\n\n", num_samples ,status);  
         #endif
         
 
@@ -539,8 +542,25 @@ int main(int argc, char *argv[])
      * transmit or receive samples!
      */
 
-    initXB200(dev);
-    GPIOtest(dev);//, rx_meta);
+    //initXB200(dev);
+
+    int num_samples = 40000000;
+    sync_rx_prep(dev);
+
+
+
+    sync_rx(dev,num_samples,false); //receive samples starting at ant 0
+
+
+  //  for(int i = 0; i < 4; i++){
+        //sync_rx_prep(dev);
+
+      // sync_rx(dev,num_samples,false); //receive samples asap
+
+   // }
+    
+    
+    
     printf("Finished. Number of underruns = %d\n",num_underruns);
 
 
