@@ -825,7 +825,8 @@ begin
         in_imag             => resize(rx_mux_q,16),
         in_valid            => rx_mux_valid,
 
-        out_real            => rx_sample_corrected_i,
+--		out_real            => rx_sample_corrected_i,				--NEW CHANGE
+        out_real(15 downto 2)            => rx_sample_corrected_i(15 downto 2),--added
         out_imag            => rx_sample_corrected_q,
         out_valid           => rx_sample_corrected_valid,
 
@@ -835,6 +836,11 @@ begin
         phase               => correction_rx_phase,
         correction_valid    => correction_valid
       );
+
+      --OWEN ADDED
+      --replace 2 LSB of I sample with antenna selection
+	rx_sample_corrected_i(1) <= antsel(1);
+	rx_sample_corrected_i(0) <= antsel(0);
 
 
     U_agc : entity work.bladerf_agc
